@@ -567,8 +567,8 @@ const TeamManagement = () => {
   const userRoleDropdownList = [
     "Board Members",
     "Directors",
-    "VP",
     "EVP",
+    "VP",
     "AP",
     "Senior Manager",
     "Manager",
