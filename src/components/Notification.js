@@ -1,7 +1,7 @@
 import React, { useState, useContext } from "react";
 import { Drawer, Card } from "antd";
 import { createStyles, useTheme } from "antd-style";
-import CustomModal from '../components/Modal';
+import CustomModal from "../components/Modal";
 import { AppContext } from "../context/AppContext";
 
 const useStyle = createStyles(({ token }) => ({
@@ -12,10 +12,13 @@ const useStyle = createStyles(({ token }) => ({
 }));
 
 const getProfilePictureUrl = (profilePicture) => {
-  const defaultAvatar = "data:image/svg+xml;base64,..."; 
+  const defaultAvatar = "data:image/svg+xml;base64,...";
   if (!profilePicture) return defaultAvatar;
 
-  if (typeof profilePicture === "string" && profilePicture.startsWith("data:image")) {
+  if (
+    typeof profilePicture === "string" &&
+    profilePicture.startsWith("data:image")
+  ) {
     return profilePicture;
   }
 
@@ -53,7 +56,11 @@ const Notification = ({ open, onClose }) => {
   };
 
   const getCorrectValue = (item, field) =>
-    item.changes?.[field]?.to ?? item[field] ?? item.memberData?.[field] ?? item.originalData?.[field] ?? null;
+    item.changes?.[field]?.to ??
+    item[field] ??
+    item.memberData?.[field] ??
+    item.originalData?.[field] ??
+    null;
 
   const safeStringify = (value) => {
     if (!value) return "";
@@ -67,13 +74,13 @@ const Notification = ({ open, onClose }) => {
 
   const getTeamNames = (team) => {
     if (!team) return "";
-    if (Array.isArray(team)) return team.map(t => t?.name || t).join(", ");
+    if (Array.isArray(team)) return team.map((t) => t?.name || t).join(", ");
     if (typeof team === "object") return team.name || String(team);
     return String(team);
   };
 
   const membersData = Array.isArray(notificationqueue)
-    ? notificationqueue.map(item => {
+    ? notificationqueue.map((item) => {
         const profilePictureRaw =
           item.changes?.profilePicture?.to ||
           item.profilePicture ||
@@ -90,7 +97,9 @@ const Notification = ({ open, onClose }) => {
           doj: safeStringify(getCorrectValue(item, "doj")),
           dob: safeStringify(getCorrectValue(item, "dob")),
           yoe: safeStringify(getCorrectValue(item, "yoe")),
-          about: safeStringify(getCorrectValue(item, "bio") || getCorrectValue(item, "about")),
+          about: safeStringify(
+            getCorrectValue(item, "bio") || getCorrectValue(item, "about")
+          ),
           profilePicture: getProfilePictureUrl(profilePictureRaw),
           requestType: item.requestType,
           requestedBy: safeStringify(item.requestedBy),
@@ -115,6 +124,8 @@ const Notification = ({ open, onClose }) => {
   const handleCancel = () => {
     setIsModalOpen(false);
   };
+
+  console.log(notificationqueue, "queue");
 
   return (
     <>
@@ -155,8 +166,12 @@ const Notification = ({ open, onClose }) => {
                   onError={(e) => (e.target.src = getProfilePictureUrl(null))}
                 />
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-900">{member.name}</div>
-                  <div className="text-sm text-gray-600">{member.designation}</div>
+                  <div className="font-semibold text-gray-900">
+                    {member.name}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {member.designation}
+                  </div>
                   <div className="text-xs text-gray-400">{member.team}</div>
                   {member.requestedAt && (
                     <div className="text-xs text-gray-400 mt-1">

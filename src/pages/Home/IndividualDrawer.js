@@ -25,6 +25,10 @@ const useStyle = createStyles(({ token }) => ({
 }));
 
 const IndividualDrawer = forwardRef((_, ref) => {
+  
+  
+
+  console.log("trigger 2 ")
   const [open, setOpen] = useState(false);
   const { styles } = useStyle();
   const token = useTheme();
@@ -58,6 +62,8 @@ const IndividualDrawer = forwardRef((_, ref) => {
       padding: "24px",
     },
   };
+
+
 
   const userData = currentUser
     ? [

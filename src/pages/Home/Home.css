@@ -13,6 +13,13 @@ body {
   margin-top: 8px !important;
 }
 
+.ant-menu-item span {
+  white-space: normal !important;
+  word-break: break-word !important;
+  line-height: 1.2 !important;
+  display: inline-block !important;
+}
+
 .anticon-left,
 .anticon-right {
   color: white !important;
@@ -63,6 +70,8 @@ body {
   padding-left: 5px !important;
 }
 
+
+
 .custom-center-menu .ant-menu-item {
   display: flex !important;
   justify-content: center !important;
@@ -86,4 +95,22 @@ body {
 }
 .ant-menu-item:not(.ant-menu-item-selected):hover {
   background-color: #d9382f !important;
+}
+
+@media (min-width: 768px)  {
+  .ant-menu-item {
+    padding: 6px !important;
+  }
+  .custom-center-menu .ant-menu-item{
+    margin: 4% !important;
+  }
+}
+
+@media (max-width: 768px)  {
+  *{
+    font-size: small !important;
+  }
+  .ant-table-cell{
+    padding: 5px !important;
+  }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useContext } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import {
   Modal,
   Form,
@@ -16,6 +16,7 @@ import dayjs from "dayjs";
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
 import { API_ENDPOINT } from "../entities/Endpoint";
+import { Spin } from "antd";
 
 // Styles
 const useStyle = createStyles(({ token }) => ({
@@ -36,6 +37,8 @@ const useStyle = createStyles(({ token }) => ({
 const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
   const [messageApi, contextHolder] = message.useMessage();
 
+  const [loading, setLoading] = useState(false);
+
   const { notificationqueue, setnotificationqueue } = useContext(AppContext);
   const [form] = Form.useForm();
   const { styles } = useStyle();
@@ -52,6 +55,22 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
     { name: "Strategy", id: "634eefb4b35a8abf6acbdd36" },
     { name: "Technology", id: "634eefb4b35a8abf6acbdd2c" },
     { name: "Video", id: "634eefb4b35a8abf6acbdd34" },
+    // { name: "all", id: "634eefb4b35a8abf6acbdd2a" },
+
+  ];
+
+  const roleOptions = [
+    { label: "Board Members", value: "board_members" },
+    { label: "Directors", value: "directors" },
+    { label: "VP", value: "vp" },
+    { label: "EVP", value: "evp" },
+    { label: "APV", value: "ap" },
+    { label: "Senior Manager", value: "senior_manager" },
+    { label: "Manager", value: "manager" },
+    { label: "Lead", value: "lead" },
+    { label: "Senior Specialist", value: "senior_specialist" },
+    { label: "Specialist", value: "specialist" },
+    { label: "Accountant", value: "accountant" },
   ];
 
   // Helper function to check if string is base64
@@ -68,10 +87,15 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
 
     try {
       if (typeof profilePicture === "string") {
+        if (profilePicture.startsWith("data:image/")) {
+          return profilePicture; // already a complete base64 image
+        }
+
         if (profilePicture.length > 100) {
           return `data:image/jpeg;base64,${profilePicture}`;
         }
-        return profilePicture;
+
+        return profilePicture; // likely a URL
       }
 
       if (typeof profilePicture === "object") {
@@ -159,25 +183,21 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
 
   useEffect(() => {
     if (selectedMember) {
-      console.log("Selected member:", selectedMember);
-
-      const imageUrl = getImageUrl(selectedMember?.profilePicture);
+      const imageUrl = getImageUrl(selectedMember?.profilePicture); // <- returns actual URL string
 
       const profilePicFileList = imageUrl
         ? [
-            {
-              uid: "-1",
-              name: "profile.png",
-              status: "done",
-              url: imageUrl,
-              thumbUrl: imageUrl,
-              isExisting: true,
-            },
-          ]
+          {
+            uid: "-1",
+            name: "profile.png",
+            status: "done",
+            url: imageUrl,
+            isExisting: true, // <-- marks as existing
+          },
+        ]
         : [];
 
       const teamValue = processTeamData(selectedMember?.team);
-      console.log("Processed team value:", teamValue);
 
       form.setFieldsValue({
         key: selectedMember?.key || selectedMember?._id || selectedMember?.id,
@@ -186,22 +206,29 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
         designation: selectedMember?.designation || "",
         designationText:
           selectedMember?.designationText || selectedMember?.designation || "",
-        doj: selectedMember?.doj
-          ? dayjs(selectedMember?.doj, "DD/MM/YYYY")
-          : null,
+        doj:
+          selectedMember?.doj && selectedMember?.doj !== "N/A"
+            ? dayjs(selectedMember?.doj, "DD/MM/YYYY")
+            : null,
+        dob:
+          selectedMember?.dob &&
+            selectedMember?.dob !== "N/A" &&
+            selectedMember?.dob !== "-" &&
+            dayjs(selectedMember?.dob, "DD/MM/YYYY").isValid()
+            ? dayjs(selectedMember?.dob, "DD/MM/YYYY")
+            : null,
+
         about:
           selectedMember?.about ||
           selectedMember?.content ||
           selectedMember?.bio ||
           "",
-        team: teamValue,
-        dob:
-          selectedMember?.dob && selectedMember?.dob !== "N/A"
-            ? dayjs(selectedMember?.dob, "DD/MM/YYYY")
-            : null,
         yoe: selectedMember?.yoe || "",
-        profilePic: profilePicFileList,
+        team: teamValue,
         teamSlugs: selectedMember?.teamSlugs || [],
+        userRole:
+          selectedMember.userRole || selectedMember.memberData?.userRole,
+        profilePic: profilePicFileList,
       });
     } else {
       form.resetFields();
@@ -211,40 +238,26 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
   // Handle Add operations
   const handleAdd = async () => {
     try {
+      setLoading(true); // Start loading
       const values = await form.validateFields();
       console.log("Form values for add:", values);
 
       const formData = new FormData();
 
-      // Required fields validation
       if (!values.name?.trim()) {
         message.error("Name is required");
         return;
       }
-      // if (!values.email?.trim()) {
-      //   message.error("Email is required");
-      //   return;
-      // }
+
       if (!values.designation?.trim()) {
         message.error("Designation is required");
         return;
       }
-      // if (!values.doj) {
-      //   message.error("Date of joining is required");
-      //   return;
-      // }
+
       if (!values.team || values.team.length === 0) {
         message.error("Please select at least one team");
         return;
       }
-      // if (!values.dob) {
-      //   message.error("Date of birth is required");
-      //   return;
-      // }
-      // if (!String(values.yoe).trim()) {
-      //   message.error("Years of experience is required");
-      //   return;
-      // }
 
       formData.append("name", values.name.trim());
       formData.append("email", values.email?.trim()?.toLowerCase() || "");
@@ -256,15 +269,21 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
       formData.append("doj", values.doj?.format("DD/MM/YYYY") || "");
       formData.append("dob", values.dob?.format("DD/MM/YYYY") || "");
       formData.append("content", values.about || "");
-      formData.append("yoe", values.yoe ? String(values.yoe).trim() : "");
+      // formData.append("yoe", values.yoe ? String(values.yoe).trim() : "");
 
-      // Check if teams is defined and is an array
+      formData.append(
+        "userRole",
+        roleOptions.find((role) => role.value === values.userRole)?.label ||
+        values.userRole ||
+        ""
+      );
+
       if (!Array.isArray(teams)) {
         message.error("Team list is not available");
         return;
       }
 
-      if (values.team && Array.isArray(values.team)) {
+      if (Array.isArray(values.team)) {
         const selectedTeams = values.team.map((teamId) => {
           const teamObj = teams.find((t) => t.id === teamId);
           return {
@@ -273,13 +292,11 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
           };
         });
 
-        console.log("Selected teams for add:", selectedTeams);
-
         formData.append("team", JSON.stringify(selectedTeams));
 
         values.team.forEach((teamId, index) => {
-          formData.append(`teamIds[${index}]`, teamId);
           const teamName = teams.find((t) => t.id === teamId)?.name || teamId;
+          formData.append(`teamIds[${index}]`, teamId);
           formData.append(`teamNames[${index}]`, teamName);
         });
       }
@@ -294,32 +311,28 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
           "image/png",
           "image/gif",
         ];
-        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = 5 * 1024 * 1024;
 
         if (!allowedTypes.includes(file.type)) {
           message.error(
-            "Invalid file type. Please upload JPG, PNG, or GIF files only."
+            "Invalid file type. Please upload JPG, PNG, or GIF only."
           );
           return;
         }
 
         if (file.size > maxSize) {
-          message.error(
-            "File size too large. Please upload files smaller than 5MB."
-          );
+          message.error("File size too large. Max 5MB allowed.");
           return;
         }
 
         formData.append("profilePic", file);
       }
 
-      // Debug: Log FormData contents
       console.log("FormData contents for ADD:");
       for (let pair of formData.entries()) {
         console.log(pair[0] + ": " + pair[1]);
       }
 
-      // Make API call
       const response = await axios.post(`${API_ENDPOINT}/save/data`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -330,55 +343,41 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
       if (response.data.success) {
         message.success("Member added successfully!");
         form.resetFields();
+        messageApi.success({ content: "Member Added successfully." });
 
-        messageApi.success({
-          content: "Member Added successfully.",
-        });
-
-        if (onCancel) onCancel(); // Close modal
-        if (onOk) onOk(); // Optional callback
+        onCancel?.();
+        onOk?.();
       } else {
         message.error(response.data.message || "Failed to add member");
       }
     } catch (err) {
       console.error("Add operation error:", err);
-
       if (err.response?.data?.message) {
         message.error(err.response.data.message);
-      } else if (err.message) {
-        message.error(err.message);
       } else {
-        message.error("Failed to add member");
+        message.error(err.message || "Failed to add member");
       }
+    } finally {
+      setLoading(false); // End loading
     }
   };
 
   const handleUpdate = async () => {
     try {
+      setLoading(true); // Start loading
       const values = await form.validateFields();
-      console.log("Form values for update:", values);
+      console.log("✅ Validated form values:", values);
 
       const formData = new FormData();
 
-      // ✅ Required Field Validations
-      if (!values.key) {
-        message.error("Member key is missing");
-        return;
-      }
-      if (!values.name?.trim()) {
-        message.error("Name is required");
-        return;
-      }
-      if (!values.designation?.trim()) {
-        message.error("Designation is required");
-        return;
-      }
-      if (!values.team || values.team.length === 0) {
-        message.error("Please select at least one team");
-        return;
-      }
+      // ✅ Required Fields
+      if (!values.key) return message.error("Member key is missing");
+      if (!values.name?.trim()) return message.error("Name is required");
+      if (!values.designation?.trim())
+        return message.error("Designation is required");
+      if (!values.team || values.team.length === 0)
+        return message.error("Please select at least one team");
 
-      // ✅ Append Required Fields
       formData.append("importance", values.key);
       formData.append("name", values.name.trim());
       formData.append("designation", values.designation.trim());
@@ -388,17 +387,26 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
       );
       formData.append("about", values.about || "");
 
-      // ✅ Optional Fields (set to "" or null safely)
+      // ✅ Optional Fields
       formData.append("email", values.email?.trim().toLowerCase() || "");
       formData.append("doj", values.doj?.format("DD/MM/YYYY") || "");
+      formData.append("dob", values.dob?.format("DD/MM/YYYY") || "");
+      // formData.append(
+      //   "yoe",
+      //   values.yoe !== undefined ? String(values.yoe).trim() : ""
+      // );
 
-      formData.append("dob", values.dob ? values.dob.format("DD/MM/YYYY") : "");
-      formData.append(
-        "yoe",
-        values.yoe !== undefined ? String(values.yoe).trim() : ""
-      );
+      // ✅ User Role
+      if (values.userRole) {
+        const roleLabel =
+          roleOptions.find((role) => role.value === values.userRole)?.label ||
+          values.userRole;
+        formData.append("userRole", roleLabel);
+      } else {
+        formData.append("userRole", "");
+      }
 
-      // ✅ Team Info Handling
+      // ✅ Team IDs and Names
       if (Array.isArray(values.team)) {
         const selectedTeams = values.team.map((teamId) => {
           const teamObj = teams.find((t) => t.id === teamId);
@@ -409,53 +417,57 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
         });
 
         formData.append("team", JSON.stringify(selectedTeams));
+
         selectedTeams.forEach((team, index) => {
           formData.append(`teamIds[${index}]`, team._id);
           formData.append(`teamNames[${index}]`, team.name);
         });
       }
 
-      // ✅ Team Slugs (if available)
+      // ✅ Team Slugs
       if (Array.isArray(values.teamSlugs)) {
         formData.append("teamSlugs", JSON.stringify(values.teamSlugs));
       }
 
-      // ✅ Profile Picture Validation
+      // ✅ Profile Picture Handling
       const fileList = values.profilePic;
-      if (fileList && fileList.length > 0) {
-        const file = fileList[0];
-        if (file.originFileObj) {
-          const allowedTypes = [
-            "image/jpeg",
-            "image/jpg",
-            "image/png",
-            "image/gif",
-          ];
-          const maxSize = 5 * 1024 * 1024;
+      const file = fileList?.[0];
 
-          if (!allowedTypes.includes(file.originFileObj.type)) {
-            message.error("Invalid file type. Only JPG, PNG, or GIF allowed.");
-            return;
-          }
+      if (file?.originFileObj) {
+        // User uploaded a new image
+        const allowedTypes = [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/gif",
+        ];
+        const maxSize = 5 * 1024 * 1024;
 
-          if (file.originFileObj.size > maxSize) {
-            message.error("File size too large. Max 5MB allowed.");
-            return;
-          }
-
-          formData.append("profilePic", file.originFileObj);
-        } else if (file.url && !file.isExisting) {
-          formData.append("profilePicUrl", file.url);
+        if (!allowedTypes.includes(file.originFileObj.type)) {
+          return message.error(
+            "Invalid file type. Only JPG, PNG, or GIF allowed."
+          );
         }
+
+        if (file.originFileObj.size > maxSize) {
+          return message.error("File size too large. Max 5MB allowed.");
+        }
+
+        formData.append("profilePic", file.originFileObj); // <-- sent to server
+      } else if (file?.isExisting && file?.url) {
+        // Existing image retained — send URL
+        formData.append("profilePictureUrl", file.url); // <-- backend will use URL
+      } else {
+        // Image was removed or not provided
+        formData.append("removeImage", "true"); // <-- tells backend to clear
       }
 
-      // 🔍 Debug
-      console.log("Final FormData for update:");
+      // 🔍 Debugging
       for (let [key, val] of formData.entries()) {
         console.log(`${key}: ${val}`);
       }
 
-      // 🚀 API Call
+      // ✅ Send to Server
       const response = await axios.post(
         `${API_ENDPOINT}/update/member`,
         formData,
@@ -468,27 +480,30 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
       if (response.data.success !== false) {
         message.success("Member updated successfully");
 
-        // Optionally remove from queue
+        // Remove from update queue if needed
         handleDelete(values.key);
 
         // Close modal
-        if (onCancel) onCancel();
+        onCancel?.();
 
-        messageApi.success({
-          content: "Member updated successfully.",
-        });
+        // Success message
+        messageApi.success({ content: "Member updated successfully." });
 
-        if (onOk) onOk();
+        // Callback
+        onOk?.();
       } else {
         message.error(response.data.message || "Failed to update member");
       }
     } catch (err) {
-      console.error("Update error:", err);
+      console.error("❌ Error in handleUpdate:", err);
+
       if (err.response?.data?.message) {
         message.error(err.response.data.message);
       } else {
         message.error(err.message || "Update failed");
       }
+    } finally {
+      setLoading(false); // End loading
     }
   };
 
@@ -547,12 +562,16 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
           footer={[
             <Button
               key="submit"
-              className="!mt-3"
+              className="!mt-1 !ml-auto flex items-center justify-center gap-2"
               ghost
               type="primary"
               onClick={handleModalOk}
+              disabled={loading}
             >
-              {selectedMember ? "Update Member" : "Add Member"}
+              <span className="flex items-center gap-2">
+                {loading && <Spin size="small" />}
+                {selectedMember ? "Update Member" : "Add Member"}
+              </span>
             </Button>,
           ]}
         >
@@ -661,6 +680,29 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
             </Form.Item>
 
             <Form.Item
+              label="User Role"
+              name="userRole"
+              rules={[
+                { required: true, message: "Please select a user role!" },
+              ]}
+            >
+              <Select
+                placeholder="Select user role"
+                showSearch
+                allowClear
+                filterOption={(input, option) =>
+                  option?.children?.toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {roleOptions.map((role) => (
+                  <Select.Option key={role.value} value={role.value}>
+                    {role.label}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item
               label="Date of Birth"
               name="dob"
               rules={[
@@ -674,7 +716,7 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
               />
             </Form.Item>
 
-            <Form.Item
+            {/* <Form.Item
               label="Years of Experience"
               name="yoe"
               rules={[
@@ -689,7 +731,7 @@ const CustomModal = ({ open, onOk, onCancel, selectedMember }) => {
               ]}
             >
               <Input placeholder="Enter years of experience (e.g., 2.5)" />
-            </Form.Item>
+            </Form.Item> */}
 
             {selectedMember && (
               <Form.Item name="teamSlugs" hidden>

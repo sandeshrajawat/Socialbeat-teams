@@ -9,6 +9,11 @@ import React, {
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import { LoadingOutlined, PlusOutlined } from "@ant-design/icons";
+import { MenuOutlined } from "@ant-design/icons";
+
+import { Typography } from "antd";
+
 import { DatePicker } from "antd";
 
 import {
@@ -189,30 +194,28 @@ const ProfileDrawer = ({
 
   const handleImageUpload = async (info) => {
     const file = info.file.originFileObj || info.file;
-    if (!file || !isValidImageFile(file)) {
+    if (!file || !file.type.startsWith("image/")) {
+      message.error("Please upload a valid image file.");
       return;
     }
 
     setUploadLoading(true);
-    try {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditedData((prev) => ({
-          ...prev,
-          profilePicture: reader.result,
-        }));
-        setImageChanged(true);
-        setUploadLoading(false);
-      };
-      reader.onerror = () => {
-        message.error("Failed to read image file");
-        setUploadLoading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      message.error("Error uploading image");
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditedData((prev) => ({
+        ...prev,
+        profilePicture: reader.result, // base64 string
+      }));
+      setImageChanged(true);
       setUploadLoading(false);
-    }
+    };
+    reader.onerror = () => {
+      message.error("Failed to read image file");
+      setUploadLoading(false);
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleImageRemove = () => {
@@ -230,29 +233,19 @@ const ProfileDrawer = ({
         requestType: "profile_update",
         requestedBy: email,
         requestedAt: new Date().toISOString(),
-        originalData: originalData,
-        changes: {},
       };
 
-      Object.keys(editedData).forEach((key) => {
-        if (editedData[key] !== originalData[key]) {
-          hrRequestData.changes[key] = {
-            from: originalData[key],
-            to: editedData[key],
-          };
-        }
-      });
-
+      // Simulate sending to queue or API
       messageApi.success({
         content: "Profile update request sent to HR successfully.",
       });
 
       setnotificationqueue((prev) => [...prev, hrRequestData]);
 
+      // Reset states
       setIsEditing(false);
       setImageChanged(false);
       setIsDrawerVisible(false);
-
       setEditedData(originalData);
     } catch (error) {
       message.error("Failed to send request to HR");
@@ -261,6 +254,7 @@ const ProfileDrawer = ({
 
   const handleUpdate = () => {
     if (onOpenModal) {
+      console.log(selectedMember, "datas sending to modal");
       onOpenModal(selectedMember);
     }
   };
@@ -346,7 +340,7 @@ const ProfileDrawer = ({
                   setOriginalData({ ...selectedMember });
                 }}
               >
-                <button className="flex items-center border-2 border-[#8888] p-[5px] rounded-md ">
+                <button className="flex items-center border-2 border-[#8888] p-[5px] rounded-md">
                   <EditOutlined style={{ fontSize: 20 }} />
                   <span className="ml-2">Edit</span>
                 </button>
@@ -373,41 +367,39 @@ const ProfileDrawer = ({
                         <Image
                           width={100}
                           className="!p-2"
-                          src={getProfilePictureUrl(
-                            selectedMember?.profilePicture
-                          )}
+                          src={editedData.profilePicture}
                           alt="Profile"
                           fallback="/default-avatar.png"
+                          preview={false}
                         />
-
-                        {uploadLoading && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              background: "rgba(0,0,0,0.5)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "white",
-                            }}
-                          >
-                            Loading...
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <div>
-                        <UploadOutlined />
-                        <div style={{ marginTop: 8 }}>
-                          {uploadLoading ? "Uploading..." : "Upload"}
-                        </div>
+                        {uploadLoading ? <LoadingOutlined /> : <PlusOutlined />}
+                        <div style={{ marginTop: 8 }}>Upload</div>
                       </div>
                     )}
                   </Upload>
+
+                  {uploadLoading && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0,0,0,0.5)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                      }}
+                    >
+                      Loading...
+                    </div>
+                  )}
+
                   {editedData.profilePicture && (
                     <Button
                       icon={<DeleteOutlined />}
@@ -419,6 +411,7 @@ const ProfileDrawer = ({
                       Remove
                     </Button>
                   )}
+
                   {imageChanged && (
                     <div
                       style={{
@@ -449,18 +442,7 @@ const ProfileDrawer = ({
             </Descriptions.Item>
 
             <Descriptions.Item label="YOE">
-              {isEditing ? (
-                <Input
-                  type="number"
-                  value={editedData.yoe || ""}
-                  onChange={(e) => handleInputChange("yoe", e.target.value)}
-                  min={0}
-                  step={0.1}
-                  placeholder="Enter years of experience"
-                />
-              ) : (
-                selectedMember.yoe || "N/A"
-              )}
+              {selectedMember?.yoe || "N/A"}
             </Descriptions.Item>
 
             <Descriptions.Item label="Designation">
@@ -478,6 +460,10 @@ const ProfileDrawer = ({
 
             <Descriptions.Item label="Team">
               {selectedMember.team || "N/A"}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Role">
+              {selectedMember.userRole || "N/A"}
             </Descriptions.Item>
 
             <Descriptions.Item label="Date of Joining">
@@ -541,12 +527,27 @@ const ProfileDrawer = ({
   );
 };
 
+const dropdownItems = [
+  {
+    key: "1",
+    label: "Item 1",
+  },
+  {
+    key: "2",
+    label: "Item 2",
+  },
+  {
+    key: "3",
+    label: "Item 3",
+  },
+];
+
 const TeamManagement = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
-  const [selectedTeamSlug, setSelectedTeamSlug] = useState("all");
+  const [selectedTeamSlug, setSelectedTeamSlug] = useState("634eefb4b35a8abf6acbdd2a");
   const [selectedTeam, setSelectedTeam] = useState("634eefb4b35a8abf6acbdd2a");
 
   const [searchValue, setSearchValue] = useState("");
@@ -562,6 +563,44 @@ const TeamManagement = () => {
 
   const [reorderedDataSource, setReorderedDataSource] = useState([]);
 
+  // User role options
+  const userRoleDropdownList = [
+    "Board Members",
+    "Directors",
+    "VP",
+    "EVP",
+    "AP",
+    "Senior Manager",
+    "Manager",
+    "Lead",
+    "Senior Specialist",
+    "Specialist",
+    "Accountant",
+  ].map((role, index) => ({
+    key: `role-${index}`,
+    label: role,
+    onClick: () => handleRoleSelect(role),
+  }));
+
+  const handleRoleSelect = (role) => {
+    console.log("Selected role:", role);
+    console.log("Filtered Data Source:", filteredDataSource);
+
+    // Ensure filteredDataSource is an array
+    if (!Array.isArray(filteredDataSource)) {
+      console.error("filteredDataSource is not an array");
+      return;
+    }
+
+    const filteredByRole = filteredDataSource.filter((item) => {
+      // Use either item.userRole or item.memberData.userRole, based on your structure
+      const userRole = item.userRole || item.memberData?.userRole;
+      return userRole?.toLowerCase() === role.toLowerCase();
+    });
+
+    setReorderedDataSource(filteredByRole);
+  };
+
   const {
     currentUser,
     setCurrentUser,
@@ -571,6 +610,36 @@ const TeamManagement = () => {
     headerFlag,
     setHeaderFlag,
   } = useContext(AppContext);
+
+  // Secondary authentication check - redirect if not logged in
+  useEffect(() => {
+    const checkAuthentication = () => {
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      if (!isLoggedIn) {
+        navigate('/', { replace: true });
+      }
+    };
+
+    // Check immediately on mount
+    checkAuthentication();
+
+    // Listen for storage changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'isLoggedIn') {
+        checkAuthentication();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Periodic check as backup (less frequent since ProtectedRoute already handles this)
+    const interval = setInterval(checkAuthentication, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [navigate]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 1 } })
@@ -677,8 +746,9 @@ const TeamManagement = () => {
         );
       },
     },
-    { title: "Date of Joining", dataIndex: "doj", key: "doj" },
-    { title: "DOB", dataIndex: "dob", key: "dob" },
+    // { title: "Date of Joining", dataIndex: "doj", key: "doj" },
+    // { title: "DOB", dataIndex: "dob", key: "dob" },
+    { title: "Role", dataIndex: "userRole", key: "userRole" },
     {
       title: "Action",
       key: "action",
@@ -787,8 +857,8 @@ const TeamManagement = () => {
       });
 
       const members = res.data?.members || [];
-
       console.log(members, "hhhhh h");
+
       const parseDDMMYYYY = (dateStr) => {
         if (!dateStr || typeof dateStr !== "string") return null;
         const [day, month, year] = dateStr.split("/");
@@ -808,29 +878,38 @@ const TeamManagement = () => {
         // Parse and format DOB
         const rawDob = memberData.dob;
         const parsedDob = parseDDMMYYYY(rawDob);
-        const formattedDob = parsedDob ? formatDate(parsedDob, "en-GB") : "N/A";
+        const formattedDob = parsedDob ? formatDate(parsedDob, "en-GB") : "-";
 
         // Parse and format DOJ
-        const dojDate = new Date(memberData.doj);
-        const formattedDoj = !isNaN(dojDate.getTime())
-          ? dojDate.toLocaleDateString("en-GB")
-          : "N/A";
+        const rawDoj = memberData.doj;
+        const parsedDoj = parseDDMMYYYY(rawDoj);
+        const formattedDoj = parsedDoj ? formatDate(parsedDoj, "en-GB") : "-";
+
+        // Calculate YOE
+        let yoe = "-";
+        if (parsedDoj) {
+          const today = dayjs();
+          const dojDayjs = dayjs(parsedDoj);
+          const diffInDays = today.diff(dojDayjs, "day");
+          yoe = (diffInDays / 365).toFixed(1);
+        }
 
         return {
           key: memberData._id || index.toString(),
           name: memberData.name || "N/A",
           email: memberData.email || "N/A",
           designation:
-            memberData.designationText || memberData.designation || "N/A",
+            memberData.designationText || memberData.designation || "-",
           team: Array.isArray(memberData.team)
             ? memberData.team.map((team) => team.name || team).join(", ")
             : "No Teams",
           isActive: memberData.isActive ?? true,
           profilePicture: memberData.profilePicture,
           bio: memberData.bio || "",
-          yoe: parseInt(memberData.yoe) || 0,
           doj: formattedDoj,
           dob: formattedDob,
+          yoe: yoe,
+          userRole: memberData.userRole || "-",
           createdAt: memberData.createdAt,
           memberData: memberData,
         };
@@ -880,8 +959,16 @@ const TeamManagement = () => {
       members: reorderedList,
     };
 
+    // const payload = {
+    //   team: '634eefb4b35a8abf6acbdd2a',
+    //   members: reorderedList,
+    // };
+
     try {
-      const response = await axios.post(`${API_ENDPOINT}/position/change`, payload);
+      const response = await axios.post(
+        `${API_ENDPOINT}/position/change`,
+        payload
+      );
       messageApi.success({
         content: `Position updated successfully`,
       });
@@ -930,13 +1017,16 @@ const TeamManagement = () => {
   );
 
   const handleViewProfile = useCallback(() => {
+    console.log("triggered success")
     if (currentUser) {
+      console.log(currentUser, 'this is current user');
       setSelectedMember(currentUser);
       setIsDrawerVisible(true);
     } else {
       message.info("Current user profile not available");
     }
   }, [currentUser, setSelectedMember, setIsDrawerVisible]);
+
   const items = [
     { label: "All", key: "634eefb4b35a8abf6acbdd2a" },
     { label: "Business Development", key: "634eefb4b35a8abf6acbdd3c" },
@@ -974,24 +1064,29 @@ const TeamManagement = () => {
       />
 
       <div className="grid grid-cols-12">
-        <div className="col-span-2">
+        {/* Sidebar */}
+        <div className="col-span-2 overflow-x-hidden hidden sm:block">
           <Menu
             onClick={handleTeamMenuClick}
             mode="vertical"
             theme="dark"
             style={{
               width: "100%",
-              height: "88vh",
+              whiteSpace: "normal",
+              wordBreak: "break-word",
             }}
             items={items}
             selectedKeys={[selectedTeam]}
-            className="custom-center-menu !text-start"
+            className="custom-center-menu !text-start text-sm md:!text-xs lg:!text-sm"
           />
         </div>
 
-        <div className="col-span-10 col-start-3 overflow-y-auto h-[88vh]">
-          <div className="p-4 bg-[#333] !border-3 mx-auto rounded-lg !mt-3 !ml-3 !mr-3 !mb-2 flex">
-            <div className="!me-3 !w-full">
+        {/* Main Content */}
+        <div className="col-span-12 p-3 sm:col-span-10 sm:col-start-3 overflow-y-auto h-[88vh]">
+          {/* Header/Search Bar Section */}
+          <div className="p-4 bg-[#333] border-3 mx-auto rounded-lg flex flex-col md:flex-row md:items-center md:justify-between md:gap-x-2 md:flex-nowrap">
+            {/* LEFT: Search + Hamburger (small only) */}
+            <div className="w-full md:flex-1 flex items-center">
               <AutoComplete
                 options={options}
                 style={{ width: "100%" }}
@@ -1020,31 +1115,149 @@ const TeamManagement = () => {
                   style={{ width: "100%" }}
                 />
               </AutoComplete>
+
+              {/* Hamburger - only for small screens */}
+              <div className="sm:hidden ml-2">
+                <Dropdown
+                  trigger={["click"]}
+                  placement="bottomRight"
+                  menu={{
+                    items: [
+                      {
+                        key: "role",
+                        label: (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Dropdown
+                              menu={{ items: userRoleDropdownList }}
+                              placement="bottom"
+                              arrow
+                              getPopupContainer={() => document.body} // render at body level
+                              popupClassName="z-[9999]" // Tailwind z-index utility
+                            >
+                              <Button className="w-full sm:w-auto">
+                                <Space>
+                                  Select User Role
+                                  <DownOutlined />
+                                </Space>
+                              </Button>
+                            </Dropdown>
+                          </div>
+                        ),
+                      },
+                      {
+                        key: "profile",
+                        label: (
+                          <Button
+                            size="medium"
+                            className="text-base w-full sm:w-auto"
+                            onClick={handleViewProfile}
+                          >
+                            View Profile
+                          </Button>
+                        ),
+                      },
+                      {
+                        key: "team",
+                        label: (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Dropdown
+                              menu={{
+                                items,
+                                selectable: true,
+                                defaultSelectedKeys: [
+                                  "634eefb4b35a8abf6acbdd2a",
+                                ],
+                                onClick: handleTeamMenuClick,
+                              }}
+                              placement="bottom"
+                              arrow
+                            >
+                              <Button className="w-full sm:w-auto">
+                                <Space>
+                                  Select Team
+                                  <DownOutlined />
+                                </Space>
+                              </Button>
+                            </Dropdown>
+                          </div>
+                        ),
+                      },
+                      ...(headerFlag
+                        ? [
+                          {
+                            key: "menu",
+                            label: (
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Dropdown
+                                  menu={menuProps}
+                                  trigger={["click"]}
+                                >
+                                  <Button className="w-full sm:w-auto">
+                                    <Space>
+                                      Menu
+                                      <DownOutlined />
+                                    </Space>
+                                  </Button>
+                                </Dropdown>
+                              </div>
+                            ),
+                          },
+                        ]
+                        : []),
+                    ],
+                  }}
+                >
+                  <Button icon={<MenuOutlined />} />
+                </Dropdown>
+              </div>
             </div>
 
-            <div className="!me-3">
-              <Button
-                size="medium"
-                className="text-base ml-4"
-                onClick={handleViewProfile}
-              >
-                View Profile
-              </Button>
-            </div>
-            <div>
-              {headerFlag && (
-                <Dropdown menu={menuProps} trigger={["click"]}>
-                  <Button className="ml-4">
+            {/* RIGHT: Visible only on sm+ and split equally */}
+            <div className="hidden sm:flex  gap-2">
+              {/* Select Role */}
+              <div className="">
+                <Dropdown
+                  menu={{ items: userRoleDropdownList }}
+                  placement="bottom"
+                  arrow
+                >
+                  <Button className="">
                     <Space>
-                      Menu
+                      Select User Role
                       <DownOutlined />
                     </Space>
                   </Button>
                 </Dropdown>
+              </div>
+
+              {/* View Profile */}
+              <div className="">
+                <Button
+                  size="medium"
+                  className="text-base"
+                  onClick={handleViewProfile}
+                >
+                  View Profile
+                </Button>
+              </div>
+
+              {/* Menu (if shown) */}
+              {headerFlag && (
+                <div className="">
+                  <Dropdown menu={menuProps} trigger={["click"]}>
+                    <Button className="">
+                      <Space>
+                        Menu
+                        <DownOutlined />
+                      </Space>
+                    </Button>
+                  </Dropdown>
+                </div>
               )}
             </div>
           </div>
 
+          {/* Table Section */}
           {headerFlag ? (
             <DndContext
               sensors={sensors}
@@ -1055,9 +1268,27 @@ const TeamManagement = () => {
                 items={reorderedDataSource.map((i) => i.key)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="py-2 px-3">
+                <div className="py-2 ">
+                  <div className="w-full overflow-x-auto border border-gray-300 rounded-xl">
+                    <div className="min-w-[1000px] rounded-xl overflow-hidden">
+                      <Table
+                        components={{ body: { row: Row } }}
+                        rowKey="key"
+                        pagination={false}
+                        columns={columns}
+                        dataSource={reorderedDataSource}
+                        loading={loading}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="py-2 ">
+              <div className="w-full overflow-x-auto border border-gray-300 rounded-xl">
+                <div className="min-w-[1000px] rounded-xl overflow-hidden">
                   <Table
-                    components={{ body: { row: Row } }}
                     rowKey="key"
                     pagination={false}
                     columns={columns}
@@ -1066,28 +1297,13 @@ const TeamManagement = () => {
                     style={{
                       borderRadius: "12px",
                       border: "1px solid #ccc",
-                      overflow: "hidden",
                     }}
                   />
                 </div>
-              </SortableContext>
-            </DndContext>
-          ) : (
-            <div className="py-2 px-3">
-              <Table
-                rowKey="key"
-                pagination={false}
-                columns={columns}
-                dataSource={reorderedDataSource}
-                loading={loading}
-                style={{
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                  border: "1px solid #ccc",
-                }}
-              />
+              </div>
             </div>
           )}
+          {/* Drawer */}
           <ProfileDrawer
             selectedMember={selectedMember}
             isDrawerVisible={isDrawerVisible}
